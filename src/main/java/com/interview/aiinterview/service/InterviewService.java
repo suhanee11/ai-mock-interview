@@ -1,8 +1,11 @@
 package com.interview.aiinterview.service;
 
 import com.interview.aiinterview.model.InterviewResponse;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
 import java.util.List;
 import java.util.Map;
@@ -12,13 +15,14 @@ public class InterviewService {
 
     @Value("${gemini.api.key}")
     private String API_KEY;
-   private final WebClient webClient = WebClient.builder()
-                .codecs(configurer ->
-                        configurer.defaultCodecs()
-                                .maxInMemorySize(16 * 1024 * 1024))
-                .build();
 
+    private final WebClient webClient = WebClient.builder()
+            .codecs(configurer ->
+                    configurer.defaultCodecs()
+                            .maxInMemorySize(16 * 1024 * 1024))
+            .build();
 
+    // existing method — no changes
     public InterviewResponse generateQuestions(String jobRole) {
         String prompt = String.format(
                 "Generate exactly 5 technical interview questions for a %s position. " +
@@ -29,6 +33,40 @@ public class InterviewService {
         );
         return callGemini(prompt);
     }
+
+    // NEW method — resume based questions
+    public InterviewResponse generateQuestionsFromResume(String jobRole, MultipartFile resume) {
+        try {
+            // extract text from PDF
+            String resumeText;
+            try (PDDocument doc = PDDocument.load(resume.getInputStream())) {
+                resumeText = new PDFTextStripper().getText(doc);
+            }
+
+            String prompt = String.format(
+                    "You are an expert technical interviewer for %s roles.\n\n" +
+                            "Here is the candidate's resume:\n%s\n\n" +
+                            "Based on their specific projects, skills, and experience mentioned in the resume, " +
+                            "generate exactly 5 tailored technical interview questions.\n" +
+                            "The questions should:\n" +
+                            "- Reference their actual projects or technologies they have used\n" +
+                            "- Mix easy, medium and hard difficulty\n" +
+                            "- Be specific to their background, not generic\n" +
+                            "Format strictly as numbered list:\n" +
+                            "1. question\n2. question\n3. question\n4. question\n5. question\n" +
+                            "DO NOT use markdown formatting like ** or * in the questions.",
+                    jobRole, resumeText
+            );
+
+            return callGemini(prompt);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new InterviewResponse("Error reading resume: " + e.getMessage(), false);
+        }
+    }
+
+    // existing method — no changes
     public InterviewResponse getFeedback(String question, String answer, String jobRole) {
         String prompt = String.format(
                 "You are a strict interviewer for %s roles.\n" +
@@ -49,7 +87,6 @@ public class InterviewService {
         );
         return callGemini(prompt);
     }
-
 
     private InterviewResponse callGemini(String prompt) {
         try {
@@ -86,4 +123,4 @@ public class InterviewService {
             return new InterviewResponse("Error: " + e.getMessage(), false);
         }
     }
-    }
+}
