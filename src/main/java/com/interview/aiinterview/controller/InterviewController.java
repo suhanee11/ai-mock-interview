@@ -11,7 +11,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/interview")
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(origins = "https://ai-mock-interview-frontend-kappa.vercel.app")
 public class InterviewController {
 
     @Autowired
